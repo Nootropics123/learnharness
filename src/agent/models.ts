@@ -12,6 +12,7 @@ import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import { type ModelRole } from "../../config.ts";
 import { DEFAULT_THINKING_ORDER } from "../core/settings.ts";
 import packageMetadata from "../../package.json" with { type: "json" };
+import { CodexOAuthCredentialStore } from "../auth/codex-oauth.ts";
 
 /** App identity is immutable and shared by Models and every native Agent.
  * Agent's default Pi attribution otherwise overrides the Models identity. */
@@ -55,7 +56,7 @@ let collection: ReturnType<typeof createModels> | undefined;
  *  keyPresent. */
 export function piModels() {
 	if (!collection) {
-		collection = createModels({ identity: APP_IDENTITY });
+		collection = createModels({ identity: APP_IDENTITY, credentials: new CodexOAuthCredentialStore() });
 		for (const provider of builtinProviders()) collection.setProvider(provider);
 	}
 	return collection;
