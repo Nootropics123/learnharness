@@ -4,13 +4,13 @@ import os from "node:os";
 import path from "node:path";
 import { describe, it } from "node:test";
 import type { OAuthAuth } from "@earendil-works/pi-ai";
-import { createCodexOAuthAdapter } from "../src/auth/codex-oauth.ts";
+import { createOpenAIOAuthAdapter } from "../src/auth/codex-oauth.ts";
 import { catalogProviders, modelCatalog } from "../src/server/model-catalog.ts";
 
 function tempAuth(credential?: Record<string, unknown>) {
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lh-codex-oauth-"));
 	const file = path.join(dir, "auth.json");
-	if (credential) fs.writeFileSync(file, JSON.stringify({ "openai-codex": credential }));
+	if (credential) fs.writeFileSync(file, JSON.stringify({ openai: credential }));
 	return { dir, file };
 }
 
@@ -31,12 +31,12 @@ describe("Codex OAuth adapter", () => {
 			},
 			async toAuth(credential) { return { apiKey: credential.access }; },
 		};
-		const adapter = createCodexOAuthAdapter({ authFile: file, oauth });
+		const adapter = createOpenAIOAuthAdapter({ authFile: file, oauth });
 		const auth = await adapter.getAuth();
 		assert.equal(auth.auth.apiKey, codexToken("fresh"));
 		assert.equal(refreshes, 1);
-		assert.equal(JSON.parse(fs.readFileSync(file, "utf8"))["openai-codex"].access, codexToken("fresh"));
-		const model = adapter.models.getModel("openai-codex", "gpt-6-luna");
+		assert.equal(JSON.parse(fs.readFileSync(file, "utf8")).openai.access, codexToken("fresh"));
+		const model = adapter.models.getModel("openai", "gpt-6-luna");
 		assert.ok(model);
 		let request: Request | undefined;
 		const fetch = globalThis.fetch;
@@ -47,7 +47,7 @@ describe("Codex OAuth adapter", () => {
 		const result = await adapter.stream(model!, { messages: [{ role: "user", content: "hello", timestamp: 1 }] }).result();
 		globalThis.fetch = fetch;
 		assert.ok(request, "Codex request should use the mocked fetch");
-		assert.equal(request.headers.get("chatgpt-account-id"), "fixture-account");
+		assert.equal(request.headers.get("authorization"), `Bearer ${codexToken("fresh")}`);
 		assert.equal(result.stopReason, "error");
 		fs.rmSync(dir, { recursive: true, force: true });
 	});
@@ -56,8 +56,8 @@ describe("Codex OAuth adapter", () => {
 		const previous = process.env.PI_CODING_AGENT_DIR;
 		process.env.PI_CODING_AGENT_DIR = "/tmp/pi-coding-agent-fixture";
 		try {
-			assert.equal(createCodexOAuthAdapter().authFile, "/tmp/pi-coding-agent-fixture/auth.json");
-			assert.equal(createCodexOAuthAdapter({ authFile: "/tmp/explicit-codex-auth.json" }).authFile, "/tmp/explicit-codex-auth.json");
+			assert.equal(createOpenAIOAuthAdapter().authFile, "/tmp/pi-coding-agent-fixture/auth.json");
+			assert.equal(createOpenAIOAuthAdapter({ authFile: "/tmp/explicit-openai-auth.json" }).authFile, "/tmp/explicit-openai-auth.json");
 		} finally {
 			if (previous === undefined) delete process.env.PI_CODING_AGENT_DIR;
 			else process.env.PI_CODING_AGENT_DIR = previous;
@@ -69,8 +69,8 @@ describe("Codex OAuth adapter", () => {
 		const previous = process.env.PI_CODING_AGENT_DIR;
 		process.env.PI_CODING_AGENT_DIR = dir;
 		try {
-			assert.equal(catalogProviders().find((provider) => provider.id === "openai-codex")?.keyPresent, true);
-			assert.ok(modelCatalog().models.some((model) => model.provider === "openai-codex"));
+			assert.equal(catalogProviders().find((provider) => provider.id === "openai")?.keyPresent, true);
+			assert.ok(modelCatalog().models.some((model) => model.provider === "openai"));
 		} finally {
 			if (previous === undefined) delete process.env.PI_CODING_AGENT_DIR;
 			else process.env.PI_CODING_AGENT_DIR = previous;
@@ -81,7 +81,7 @@ describe("Codex OAuth adapter", () => {
 
 	it("reports the same clear error for a missing or unrefreshable credential file", async () => {
 		const missing = tempAuth();
-		await assert.rejects(createCodexOAuthAdapter({ authFile: missing.file }).getAuth(), /Codex OAuth unavailable/);
+		await assert.rejects(createOpenAIOAuthAdapter({ authFile: missing.file }).getAuth(), /Codex OAuth unavailable/);
 		const expired = tempAuth({ type: "oauth", access: "expired", refresh: "refresh", expires: 0 });
 		const oauth: OAuthAuth = {
 			name: "fake Codex",
@@ -89,7 +89,7 @@ describe("Codex OAuth adapter", () => {
 			async refresh() { throw new Error("refresh rejected"); },
 			async toAuth(credential) { return { apiKey: credential.access }; },
 		};
-		await assert.rejects(createCodexOAuthAdapter({ authFile: expired.file, oauth }).getAuth(), /Codex OAuth unavailable/);
+		await assert.rejects(createOpenAIOAuthAdapter({ authFile: expired.file, oauth }).getAuth(), /Codex OAuth unavailable/);
 		fs.rmSync(missing.dir, { recursive: true, force: true });
 		fs.rmSync(expired.dir, { recursive: true, force: true });
 	});

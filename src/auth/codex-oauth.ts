@@ -11,12 +11,12 @@ import type {
 	AuthOperationOptions,
 } from "@earendil-works/pi-ai";
 import { createModels, type Models, type Model, type Api, type ModelsSimpleStreamOptions, type Context } from "@earendil-works/pi-ai";
-import { openaiCodexProvider } from "@earendil-works/pi-ai/providers/openai-codex";
+import { openaiProvider } from "@earendil-works/pi-ai/providers/openai";
 
-const PROVIDER_ID = "openai-codex";
+const PROVIDER_ID = "openai";
 const DEFAULT_AUTH_FILE = path.join(".pi", "agent", "auth.json");
 
-export interface CodexOAuthOptions {
+export interface OpenAIOAuthOptions {
 	/** Pi's auth.json path. Takes precedence over PI_CODING_AGENT_DIR. */
 	authFile?: string;
 	/** Injectable for integration tests; production uses Pi's provider OAuth. */
@@ -31,7 +31,7 @@ export function codexAuthFile(authFile?: string): string {
 
 /** Synchronous, side-effect-free catalog gate; expired credentials remain
  * present because Pi's request resolver can refresh them. */
-export function codexOAuthCredentialPresent(authFile?: string): boolean {
+export function openAIOAuthCredentialPresent(authFile?: string): boolean {
 	try {
 		const parsed: unknown = JSON.parse(fs.readFileSync(codexAuthFile(authFile), "utf8"));
 		if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return false;
@@ -60,7 +60,7 @@ function isCredential(value: unknown): value is Credential {
  * flat auth.json key store. Writes are serialized per provider like Pi's
  * CredentialStore contract.
  */
-export class CodexOAuthCredentialStore implements CredentialStore {
+export class OpenAIOAuthCredentialStore implements CredentialStore {
 	private readonly file: string;
 	private chain: Promise<unknown> = Promise.resolve();
 
@@ -129,18 +129,18 @@ export class CodexOAuthCredentialStore implements CredentialStore {
 	}
 }
 
-export interface CodexOAuthAdapter {
+export interface OpenAIOAuthAdapter {
 	readonly authFile: string;
-	readonly credentials: CodexOAuthCredentialStore;
+	readonly credentials: OpenAIOAuthCredentialStore;
 	readonly models: Models;
 	getAuth(signal?: AbortSignal): Promise<AuthResult>;
 	stream(model: Model<Api>, context: Context, options?: ModelsSimpleStreamOptions): ReturnType<Models["streamSimple"]>;
 }
 
-export function createCodexOAuthAdapter(options: CodexOAuthOptions = {}): CodexOAuthAdapter {
+export function createOpenAIOAuthAdapter(options: OpenAIOAuthOptions = {}): OpenAIOAuthAdapter {
 	const authFile = codexAuthFile(options.authFile);
-	const credentials = new CodexOAuthCredentialStore(authFile);
-	const builtin = openaiCodexProvider();
+	const credentials = new OpenAIOAuthCredentialStore(authFile);
+	const builtin = openaiProvider();
 	const provider: Provider = options.oauth
 		? { ...builtin, auth: { ...builtin.auth, oauth: options.oauth } }
 		: builtin;

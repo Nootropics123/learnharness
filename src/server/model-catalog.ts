@@ -35,7 +35,7 @@ import type {
 import type { EffectiveModelSpec, EffectiveSlot } from "../core/settings-resolution.ts";
 import { AUTH_PROVIDER_KEYS } from "../core/auth-keys.ts";
 import { BACKGROUND_MODEL_ROLES, MODEL_SLOTS, type BackgroundModelRole, type ModelSlotName, type ModelsSettings } from "../core/settings.ts";
-import { codexOAuthCredentialPresent } from "../auth/codex-oauth.ts";
+import { openAIOAuthCredentialPresent } from "../auth/codex-oauth.ts";
 
 /** The picker's client-safe model entry (contract: core/contracts/models.ts). */
 export type ModelDto = ModelCatalogEntry;
@@ -125,16 +125,11 @@ export function catalogProviders(): CatalogProvider[] {
 	const keyProviders = AUTH_PROVIDER_KEYS.map((p) => ({
 		id: p.id,
 		envVar: p.envVar,
-		keyPresent: keyValue(p.envVar) !== undefined,
+		keyPresent: p.id === "openai"
+			? keyValue(p.envVar) !== undefined || openAIOAuthCredentialPresent()
+			: keyValue(p.envVar) !== undefined,
 	}));
-	return [
-		...keyProviders,
-		{
-			id: "openai-codex",
-			envVar: "PI_CODING_AGENT_DIR",
-			keyPresent: codexOAuthCredentialPresent(),
-		},
-	].sort((a, b) => a.id.localeCompare(b.id));
+	return keyProviders.sort((a, b) => a.id.localeCompare(b.id));
 }
 
 /** The providers whose key is present — the picker federates exactly
