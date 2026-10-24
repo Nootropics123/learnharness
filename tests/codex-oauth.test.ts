@@ -5,6 +5,7 @@ import path from "node:path";
 import { describe, it } from "node:test";
 import type { OAuthAuth } from "@earendil-works/pi-ai";
 import { createCodexOAuthAdapter } from "../src/auth/codex-oauth.ts";
+import { catalogProviders, modelCatalog } from "../src/server/model-catalog.ts";
 
 function tempAuth(credential?: Record<string, unknown>) {
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lh-codex-oauth-"));
@@ -61,6 +62,21 @@ describe("Codex OAuth adapter", () => {
 			if (previous === undefined) delete process.env.PI_CODING_AGENT_DIR;
 			else process.env.PI_CODING_AGENT_DIR = previous;
 		}
+	});
+
+	it("federates Codex models into the picker when Pi OAuth is present", () => {
+		const { dir, file } = tempAuth({ type: "oauth", access: "access", refresh: "refresh", expires: 0 });
+		const previous = process.env.PI_CODING_AGENT_DIR;
+		process.env.PI_CODING_AGENT_DIR = dir;
+		try {
+			assert.equal(catalogProviders().find((provider) => provider.id === "openai-codex")?.keyPresent, true);
+			assert.ok(modelCatalog().models.some((model) => model.provider === "openai-codex"));
+		} finally {
+			if (previous === undefined) delete process.env.PI_CODING_AGENT_DIR;
+			else process.env.PI_CODING_AGENT_DIR = previous;
+			fs.rmSync(dir, { recursive: true, force: true });
+		}
+		void file;
 	});
 
 	it("reports the same clear error for a missing or unrefreshable credential file", async () => {

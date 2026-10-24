@@ -29,6 +29,18 @@ export function codexAuthFile(authFile?: string): string {
 	return path.join(os.homedir(), DEFAULT_AUTH_FILE);
 }
 
+/** Synchronous, side-effect-free catalog gate; expired credentials remain
+ * present because Pi's request resolver can refresh them. */
+export function codexOAuthCredentialPresent(authFile?: string): boolean {
+	try {
+		const parsed: unknown = JSON.parse(fs.readFileSync(codexAuthFile(authFile), "utf8"));
+		if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return false;
+		return isCredential((parsed as Record<string, unknown>)[PROVIDER_ID]);
+	} catch {
+		return false;
+	}
+}
+
 function isCredential(value: unknown): value is Credential {
 	if (!value || typeof value !== "object" || Array.isArray(value)) return false;
 	const candidate = value as Record<string, unknown>;
